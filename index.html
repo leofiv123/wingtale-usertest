@@ -58,7 +58,7 @@ textarea:focus{outline:2px solid #111;border-color:#111}
 'use strict';
 var CFG = window.WT_CONFIG || {};
 var CASES = ['WPR22FA309','DCA18MA142','CEN23FA079'];
-var KEY = 'wt_usertest_v2';
+var KEY = 'wt_preview_v3';
 var params = new URLSearchParams(location.search);
 var app = document.getElementById('app');
 
@@ -69,7 +69,7 @@ var grpParam = (params.get('g') || '').toLowerCase() === 'pilot' ? 'pilot' : 'la
 if (!S || (params.get('g') && S.grp !== grpParam && S.step === 'intro')) {
   var cid = CASES[Math.floor(Math.random() * CASES.length)];
   if (params.get('c') && CASES.indexOf(params.get('c')) >= 0) cid = params.get('c');
-  S = { sid: (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)), grp: grpParam, cid: cid, step: 'intro', page: {}, ans: {} };
+  S = { sid: (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)), grp: grpParam, cid: cid, read: [], step: 'intro', page: {}, ans: {} };
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 save();
@@ -86,7 +86,7 @@ function flush() {
   var h = { 'apikey': CFG.key, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
   if (CFG.key.indexOf('sb_') !== 0) h['Authorization'] = 'Bearer ' + CFG.key;
   fetch(CFG.url.replace(/\/$/, '') + '/rest/v1/' + (CFG.table || 'usertest_events'), { method: 'POST', headers: h, body: JSON.stringify(q), keepalive: true })
-    .then(function (r) { if (r.ok) { var now = queue(); setQueue(now.slice(q.length)); } })
+    .then(function (r) { if (r.ok || (r.status >= 400 && r.status < 500)) { var now = queue(); setQueue(now.slice(q.length)); } })
     .catch(function () {})
     .then(function () { flushing = false; if (queue().length) _st(flush, 4000); });
 }
@@ -178,29 +178,12 @@ function form(title, sub, defs, store, btnText, onDone) {
   return s;
 }
 
-/* ---------- question sets ---------- */
+/* ---------- feedback ---------- */
 function defs() {
-  if (S.grp === 'pilot') return [
-    { id: 'grip', type: 'scale', label: 'How gripping was the story?', lo: 'Not at all', hi: 'Could not stop', req: true },
-    { id: 'wrong', type: 'choice', label: 'Did you notice anything factually wrong?', options: ['No', 'Not sure', 'Yes, I flagged it', 'Yes, see below'], req: true },
-    { id: 'wrong_txt', type: 'text', label: 'If yes, what was wrong?', hint: 'A page or topic is enough', opt: true },
-    { id: 'fair', type: 'scale', label: 'How fair is it to the crew?', lo: 'Unfair', hi: 'Fair and balanced', req: true },
-    { id: 'depth', type: 'choice', label: 'How was the depth?', options: ['Too simplified', 'About right', 'Too technical'], req: true },
-    { id: 'send', type: 'choice', label: 'Would you send a story like this to a student pilot or a friend?', options: ['Yes', 'Maybe', 'No'], req: true },
-    { id: 'missing', type: 'text', label: 'What is missing, or what would you change?', opt: true },
-    { id: 'bg', type: 'multi', label: 'Your aviation background', options: ['Student pilot', 'Private pilot', 'Commercial or airline pilot', 'Flight instructor', 'Air traffic control', 'Other aviation job'], req: true },
-    { id: 'other', type: 'text', label: 'Anything else?', opt: true }
-  ];
   return [
-    { id: 'grip', type: 'scale', label: 'How gripping was the story?', lo: 'Not at all', hi: 'Could not stop', req: true },
-    { id: 'easy', type: 'scale', label: 'How easy was it to follow?', lo: 'Very hard', hi: 'Very easy', req: true },
-    { id: 'retell', type: 'text', label: 'In two or three sentences, what happened and why?', hint: 'In your own words and without looking back. We are testing the story, not you.', req: true, min: 20 },
-    { id: 'words', type: 'text', label: 'Were there words or parts you did not understand?', opt: true },
-    { id: 'heavy', type: 'choice', label: 'Was anything too heavy or upsetting?', options: ['No', 'A little', 'Yes'], req: true },
-    { id: 'more', type: 'choice', label: 'Would you read another story like this?', options: ['Yes', 'Maybe', 'No'], req: true },
-    { id: 'docs', type: 'choice', label: 'How often do you watch or read documentaries or true crime?', options: ['Often', 'Sometimes', 'Rarely'], req: true },
-    { id: 'age', type: 'choice', label: 'Your age group', options: ['Under 25', '25 to 34', '35 to 49', '50 or older'], opt: true },
-    { id: 'other', type: 'text', label: 'Anything else?', opt: true }
+    { id: 'more', type: 'choice', label: 'Would you read another one?', options: ['Yes', 'Maybe', 'No'] },
+    { id: 'better', type: 'text', label: 'What would make it better?', hint: 'Anything goes. Wrong facts, boring parts, things you liked.' },
+    { id: 'fly', type: 'choice', label: 'Do you fly?', options: ['No', 'Student pilot', 'Private pilot', 'Commercial or airline', 'Other aviation job'] }
   ];
 }
 
@@ -307,24 +290,20 @@ function mountPage(frame, page, onLink) {
 function intro() {
   var s = el('div', { 'class': 'scr' });
   if (testBanner) s.appendChild(testBanner);
-  var pilot = S.grp === 'pilot';
-  s.appendChild(el('h1', null, [pilot ? 'A short check for pilots' : 'A short reading test']));
-  s.appendChild(el('p', null, [pilot
-    ? 'Thanks for taking a look. You will read one story about a real accident, retold from the NTSB report for a general audience. We would like to know whether it is accurate, fair to the crew and worth reading.'
-    : 'Thanks for taking part. You will read one story about a real aviation accident, retold from the official investigation report so it reads well on a phone.']));
-  s.appendChild(el('p', null, ['Reading takes about 10 to 15 minutes. After that there are a few short questions.']));
-  s.appendChild(el('p', null, ['Read it the way you would at home. If a page seems unclear, wrong, boring or really good, you can tap \u201cFlag\u201d at the top. If you would normally stop reading at some point, tap \u201cI would stop here\u201d. Both are optional.']));
+  s.appendChild(el('h1', null, ['Wingtale early preview']));
+  s.appendChild(el('p', null, ['Real accident reports, retold as short stories for your phone. Everything in them comes from the official investigation.']));
+  s.appendChild(el('p', null, ['There are three stories in this early version and you get one at random. It takes about 10 minutes.']));
   s.appendChild(el('hr'));
-  s.appendChild(el('p', { 'class': 'small' }, ['The story is about a real accident and may mention people who died. Your answers are anonymous and we do not ask for your name or email. Besides your answers we only record which pages you open and for how long. Some illustrations are AI generated, the photos come from the investigation. If you close the page you can come back later on the same device.']));
-  s.appendChild(el('button', { type: 'button', 'class': 'btn', on: { click: function () { send('start', { ua: navigator.userAgent, w: innerWidth, h: innerHeight }); go('read'); } } }, ['Start reading']));
+  s.appendChild(el('p', { 'class': 'small' }, ['The stories are about real accidents and some mention people who died. Illustrations are AI generated, photos come from the investigations. To see where people stop reading, this page counts which pages are opened, anonymously and without cookies or names.']));
+  s.appendChild(el('button', { type: 'button', 'class': 'btn', on: { click: function () { send('start', { ua: navigator.userAgent, w: innerWidth, h: innerHeight, ref: document.referrer || '' }); go('read'); } } }, ['Start reading']));
   return s;
 }
 function storyView() {
   var cid = S.cid, k = 0;
   var root = el('div', { 'class': 'story' });
   var lbl = el('div', { 'class': 'lbl' }, ['']);
-  var flagBtn = el('button', { type: 'button', 'class': 'pill', 'aria-label': 'Flag this page' }, [svgFlag(), 'Flag']);
-  var stopBtn = el('button', { type: 'button', 'class': 'pill' }, ['I would stop here']);
+  var flagBtn = el('button', { type: 'button', 'class': 'pill', 'aria-label': 'Give feedback on this page' }, [svgFlag(), 'Feedback']);
+  var stopBtn = el('span');
   var doneBtn = el('button', { type: 'button', 'class': 'pill acc' }, ['Finish story']);
   doneBtn.style.display = 'none';
   var bar = el('div', { 'class': 'bar' }, [lbl, stopBtn, flagBtn, doneBtn]);
@@ -352,13 +331,13 @@ function storyView() {
     });
     var last = n === data.pages.length - 1;
     doneBtn.style.display = last ? '' : 'none';
-    stopBtn.style.display = last ? 'none' : '';
+    
     lbl.textContent = 'Page ' + (n + 1) + ' of ' + data.pages.length;
   }
   function finish(stopped) {
     unmount(); window.onresize = null;
     send(stopped ? 'stop' : 'finish', { cid: cid, k: k, page: S.page[cid] });
-    S.ans.stopped = !!stopped; S.ans.stopPage = S.page[cid];
+    if (S.read.indexOf(cid) < 0) S.read.push(cid);
     go('questions');
   }
   doneBtn.addEventListener('click', function () { finish(false); });
@@ -369,7 +348,7 @@ function storyView() {
     flagSheet(function (tags, note) {
       send('flag', { cid: cid, k: k, page: S.page[cid], tags: tags, note: note });
       flagBtn.classList.add('ok'); flagBtn.lastChild.textContent = 'Saved';
-      _st(function () { flagBtn.classList.remove('ok'); flagBtn.lastChild.textContent = 'Flag'; }, 1600);
+      _st(function () { flagBtn.classList.remove('ok'); flagBtn.lastChild.textContent = 'Feedback'; }, 1600);
     });
   });
   loadCase(cid).then(function (d) { data = d; fit(); show(S.page[cid] || 0); });
@@ -400,7 +379,7 @@ function confirmSheet(title, text, yes, onYes) {
 }
 function flagSheet(onSave) {
   var st = {};
-  var def = { id: 'tags', type: 'multi', label: 'What is up with this page?', options: ['Unclear', 'Something is wrong', 'Boring', 'Really good'] };
+  var def = { id: 'tags', type: 'multi', label: 'Feedback on this page', options: ['Unclear', 'Something is wrong', 'Boring', 'Really good'] };
   var q = Q(def, st);
   var ta = el('textarea', { placeholder: 'Optional note', 'aria-label': 'Optional note', style: 'min-height:70px' });
   var cancel = el('button', { type: 'button', 'class': 'btn ghost' }, ['Cancel']);
@@ -413,16 +392,25 @@ function flagSheet(onSave) {
   });
 }
 function questions() {
-  var store = S.ans;
-  return form('A few questions', S.ans.stopped ? 'Please answer based on what you read.' : '', defs(), store, 'Send my answers', function () {
+  var store = S.ans[S.cid] = S.ans[S.cid] || {};
+  var s = form('Thanks for reading', 'Three quick things, all optional.', defs(), store, 'Send', function () {
     send('final', { answers: store });
     go('done');
   });
+  var skip = el('button', { type: 'button', 'class': 'btn ghost' }, ['Skip']);
+  skip.addEventListener('click', function () { send('final', { answers: store, skipped: true }); go('done'); });
+  s.appendChild(skip);
+  return s;
 }
+function nextCase() { for (var i = 0; i < CASES.length; i++) if (S.read.indexOf(CASES[i]) < 0 && CASES[i] !== S.cid) return CASES[i]; return null; }
 function done() {
   var s = el('div', { 'class': 'scr', style: 'justify-content:center' });
   s.appendChild(el('h1', null, ['Thank you']));
-  s.appendChild(el('p', null, ['That was all. Your answers help make these stories clearer and more accurate. You can close this page now.']));
+  s.appendChild(el('p', null, ['This really helps. If you want lifetime access once Wingtale launches, leave a comment or send a message where you found this link.']));
+  var nx = nextCase();
+  if (nx) {
+    s.appendChild(el('button', { type: 'button', 'class': 'btn', on: { click: function () { S.cid = nx; send('start', { another: true }); go('read'); } } }, ['Read another story']));
+  }
   return s;
 }
 function render() {
