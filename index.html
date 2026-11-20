@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Wingtale story test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#fff;color:#111;font-family:'Inter',system-ui,sans-serif;-webkit-text-size-adjust:100%}
+a{color:inherit}
+button{font:inherit;color:inherit}
+#app{height:100%}
+.scr{max-width:520px;margin:0 auto;padding:max(40px,env(safe-area-inset-top)) 24px 48px;display:flex;flex-direction:column;gap:16px;min-height:100%}
+.scr h1{font-weight:600;font-size:26px;line-height:1.2;letter-spacing:-.01em;margin:0 0 4px}
+.scr p{margin:0;font-size:16px;line-height:1.55;color:#222}
+.small{font-size:14px!important;line-height:1.55!important;color:#666!important}
+hr{border:0;border-top:1px solid #e6e6e6;margin:8px 0}
+.btn{appearance:none;border:0;border-radius:10px;min-height:50px;padding:0 20px;font-weight:600;font-size:16px;background:#111;color:#fff;cursor:pointer;width:100%;margin-top:8px}
+.btn[disabled]{background:#cfcfcf;cursor:default}
+.btn.ghost{background:#fff;color:#111;border:1px solid #cfcfcf}
+.qs{display:flex;flex-direction:column}
+.q{display:flex;flex-direction:column;gap:10px;padding:20px 0;border-bottom:1px solid #eee}
+.q:first-child{padding-top:4px}
+.q label.t{font-weight:600;font-size:16px;line-height:1.4}
+.q .hint{font-size:14px;color:#666;margin-top:-4px;line-height:1.45}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{appearance:none;border:1px solid #cfcfcf;background:#fff;border-radius:10px;min-height:44px;padding:10px 14px;font-size:15px;cursor:pointer;text-align:left}
+.opt.on{border-color:#111;background:#111;color:#fff}
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.scale .opt{text-align:center;padding:10px 0;font-size:16px}
+.ends{display:flex;justify-content:space-between;font-size:13px;color:#666}
+textarea{width:100%;min-height:96px;border:1px solid #cfcfcf;border-radius:10px;padding:12px;font:inherit;font-size:16px;resize:vertical;background:#fff}
+textarea:focus{outline:2px solid #111;border-color:#111}
+.req{color:#666;font-weight:400}
+.testmode{background:#f3f3f3;color:#555;font-size:13px;padding:8px 12px;border-radius:8px}
+.story{height:100%;display:flex;flex-direction:column;background:#f2f2f2}
+.bar{flex:none;display:flex;align-items:center;gap:8px;padding:max(8px,env(safe-area-inset-top)) 10px 8px;background:#fff;border-bottom:1px solid #e6e6e6}
+.bar .lbl{font-size:13px;color:#666;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{appearance:none;border:1px solid #cfcfcf;background:#fff;border-radius:8px;min-height:36px;padding:0 10px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.pill.acc,.pill.ok{background:#111;border-color:#111;color:#fff}
+.stage{flex:1;min-height:0;position:relative;overflow:hidden}
+.frame{position:absolute;left:50%;top:0;width:390px;height:844px;transform-origin:top center;background:#fff;overflow:hidden}
+.sheetbg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+.sheet{background:#fff;width:100%;max-width:520px;border-radius:14px 14px 0 0;padding:20px 20px max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+.sheet .q{border:0;padding:0}
+.row{display:flex;gap:10px}
+.row .btn{flex:1}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+'use strict';
+var CFG = window.WT_CONFIG || {};
+var CASES = ['WPR22FA309','DCA18MA142','CEN23FA079'];
+var KEY = 'wt_usertest_v2';
+var params = new URLSearchParams(location.search);
+var app = document.getElementById('app');
+
+/* ---------- state ---------- */
+var S = null;
+try { S = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { S = null; }
+var grpParam = (params.get('g') || '').toLowerCase() === 'pilot' ? 'pilot' : 'lay';
+if (!S || (params.get('g') && S.grp !== grpParam && S.step === 'intro')) {
+  var cid = CASES[Math.floor(Math.random() * CASES.length)];
+  if (params.get('c') && CASES.indexOf(params.get('c')) >= 0) cid = params.get('c');
+  S = { sid: (Date.now().toString(36) + Math.random().toString(36).slice(2, 8)), grp: grpParam, cid: cid, step: 'intro', page: {}, ans: {} };
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+save();
+
+/* ---------- sending ---------- */
+var QK = 'wt_usertest_queue';
+function queue() { try { return JSON.parse(localStorage.getItem(QK) || '[]'); } catch (e) { return []; } }
+function setQueue(q) { try { localStorage.setItem(QK, JSON.stringify(q)); } catch (e) {} }
+var flushing = false;
+function flush() {
+  if (!CFG.url || !CFG.key || flushing) return;
+  var q = queue(); if (!q.length) return;
+  flushing = true;
+  var h = { 'apikey': CFG.key, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+  if (CFG.key.indexOf('sb_') !== 0) h['Authorization'] = 'Bearer ' + CFG.key;
+  fetch(CFG.url.replace(/\/$/, '') + '/rest/v1/' + (CFG.table || 'usertest_events'), { method: 'POST', headers: h, body: JSON.stringify(q), keepalive: true })
+    .then(function (r) { if (r.ok) { var now = queue(); setQueue(now.slice(q.length)); } })
+    .catch(function () {})
+    .then(function () { flushing = false; if (queue().length) _st(flush, 4000); });
+}
+function send(kind, data) {
+  var q = queue();
+  q.push({ session: S.sid, grp: S.grp, kind: kind, data: Object.assign({ at: new Date().toISOString(), cid: S.cid }, data || {}) });
+  setQueue(q); flush();
+}
+setInterval(flush, 15000);
+
+/* ---------- helpers ---------- */
+function el(tag, attrs, kids) {
+  var e = document.createElement(tag);
+  if (attrs) for (var k in attrs) {
+    if (k === 'on') for (var ev in attrs.on) e.addEventListener(ev, attrs.on[ev]);
+    else if (k === 'html') e.innerHTML = attrs[k];
+    else if (attrs[k] !== false && attrs[k] != null) e.setAttribute(k, attrs[k] === true ? '' : attrs[k]);
+  }
+  (kids || []).forEach(function (c) { if (c == null) return; e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+  return e;
+}
+function go(step) { S.step = step; save(); render(); window.scrollTo(0, 0); }
+var testBanner = (!CFG.url || !CFG.key) ? el('div', { 'class': 'testmode' }, ['Preview. Answers are not saved.']) : null;
+
+/* ---------- question widgets ---------- */
+function Q(def, store) {
+  var wrap = el('div', { 'class': 'q' });
+  wrap.appendChild(el('label', { 'class': 't' }, [def.label, def.opt ? el('span', { 'class': 'req' }, [' (optional)']) : null]));
+  if (def.hint) wrap.appendChild(el('div', { 'class': 'hint' }, [def.hint]));
+  if (def.type === 'scale') {
+    var g = el('div', { 'class': 'scale' });
+    [1, 2, 3, 4, 5].forEach(function (n) {
+      var b = el('button', { type: 'button', 'class': 'opt' + (store[def.id] === n ? ' on' : ''), 'aria-pressed': store[def.id] === n ? 'true' : 'false' }, [String(n)]);
+      b.addEventListener('click', function () { store[def.id] = n; save(); Array.prototype.forEach.call(g.children, function (c, i) { c.classList.toggle('on', i === n - 1); c.setAttribute('aria-pressed', i === n - 1 ? 'true' : 'false'); }); wrap.dispatchEvent(new Event('change', { bubbles: true })); });
+      g.appendChild(b);
+    });
+    wrap.appendChild(g);
+    wrap.appendChild(el('div', { 'class': 'ends' }, [el('span', null, [def.lo]), el('span', null, [def.hi])]));
+  } else if (def.type === 'choice' || def.type === 'multi') {
+    var o = el('div', { 'class': 'opts' });
+    def.options.forEach(function (txt) {
+      var on = def.type === 'multi' ? (store[def.id] || []).indexOf(txt) >= 0 : store[def.id] === txt;
+      var b = el('button', { type: 'button', 'class': 'opt' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false' }, [txt]);
+      b.addEventListener('click', function () {
+        if (def.type === 'multi') {
+          var arr = (store[def.id] || []).slice(); var i = arr.indexOf(txt);
+          if (i >= 0) arr.splice(i, 1); else arr.push(txt); store[def.id] = arr;
+          b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false');
+        } else {
+          store[def.id] = txt;
+          Array.prototype.forEach.call(o.children, function (c) { var x = c.textContent === txt; c.classList.toggle('on', x); c.setAttribute('aria-pressed', x ? 'true' : 'false'); });
+        }
+        save(); wrap.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      o.appendChild(b);
+    });
+    wrap.appendChild(o);
+  } else {
+    var id = 'q_' + def.id;
+    wrap.firstChild.setAttribute('for', id);
+    var ta = el('textarea', { id: id, placeholder: def.ph || '' });
+    ta.value = store[def.id] || '';
+    ta.addEventListener('input', function () { store[def.id] = ta.value; save(); wrap.dispatchEvent(new Event('change', { bubbles: true })); });
+    wrap.appendChild(ta);
+  }
+  return wrap;
+}
+function filled(def, store) {
+  if (!def.req) return true;
+  var v = store[def.id];
+  if (def.type === 'text') return !!v && v.trim().length >= (def.min || 1);
+  if (def.type === 'multi') return !!v && v.length > 0;
+  return v != null && v !== '';
+}
+function form(title, sub, defs, store, btnText, onDone) {
+  var s = el('div', { 'class': 'scr' });
+  if (testBanner) s.appendChild(testBanner.cloneNode(true));
+  s.appendChild(el('h1', null, [title]));
+  if (sub) s.appendChild(el('p', { 'class': 'small' }, [sub]));
+  var card = el('div', { 'class': 'qs' });
+  defs.forEach(function (d) { card.appendChild(Q(d, store)); });
+  s.appendChild(card);
+  var btn = el('button', { type: 'button', 'class': 'btn' }, [btnText]);
+  function check() { btn.disabled = !defs.every(function (d) { return filled(d, store); }); }
+  card.addEventListener('change', check); check();
+  btn.addEventListener('click', function () { if (!btn.disabled) onDone(); });
+  s.appendChild(btn);
+
+  return s;
+}
+
+/* ---------- question sets ---------- */
+function defs() {
+  if (S.grp === 'pilot') return [
+    { id: 'grip', type: 'scale', label: 'How gripping was the story?', lo: 'Not at all', hi: 'Could not stop', req: true },
+    { id: 'wrong', type: 'choice', label: 'Did you notice anything factually wrong?', options: ['No', 'Not sure', 'Yes, I flagged it', 'Yes, see below'], req: true },
+    { id: 'wrong_txt', type: 'text', label: 'If yes, what was wrong?', hint: 'A page or topic is enough', opt: true },
+    { id: 'fair', type: 'scale', label: 'How fair is it to the crew?', lo: 'Unfair', hi: 'Fair and balanced', req: true },
+    { id: 'depth', type: 'choice', label: 'How was the depth?', options: ['Too simplified', 'About right', 'Too technical'], req: true },
+    { id: 'send', type: 'choice', label: 'Would you send a story like this to a student pilot or a friend?', options: ['Yes', 'Maybe', 'No'], req: true },
+    { id: 'missing', type: 'text', label: 'What is missing, or what would you change?', opt: true },
+    { id: 'bg', type: 'multi', label: 'Your aviation background', options: ['Student pilot', 'Private pilot', 'Commercial or airline pilot', 'Flight instructor', 'Air traffic control', 'Other aviation job'], req: true },
+    { id: 'other', type: 'text', label: 'Anything else?', opt: true }
+  ];
+  return [
+    { id: 'grip', type: 'scale', label: 'How gripping was the story?', lo: 'Not at all', hi: 'Could not stop', req: true },
+    { id: 'easy', type: 'scale', label: 'How easy was it to follow?', lo: 'Very hard', hi: 'Very easy', req: true },
+    { id: 'retell', type: 'text', label: 'In two or three sentences, what happened and why?', hint: 'In your own words and without looking back. We are testing the story, not you.', req: true, min: 20 },
+    { id: 'words', type: 'text', label: 'Were there words or parts you did not understand?', opt: true },
+    { id: 'heavy', type: 'choice', label: 'Was anything too heavy or upsetting?', options: ['No', 'A little', 'Yes'], req: true },
+    { id: 'more', type: 'choice', label: 'Would you read another story like this?', options: ['Yes', 'Maybe', 'No'], req: true },
+    { id: 'docs', type: 'choice', label: 'How often do you watch or read documentaries or true crime?', options: ['Often', 'Sometimes', 'Rarely'], req: true },
+    { id: 'age', type: 'choice', label: 'Your age group', options: ['Under 25', '25 to 34', '35 to 49', '50 or older'], opt: true },
+    { id: 'other', type: 'text', label: 'Anything else?', opt: true }
+  ];
+}
+
+/* ---------- DC page runtime ---------- */
+var cache = {};
+function loadCase(cid) {
+  if (cache[cid]) return Promise.resolve(cache[cid]);
+  return fetch('cases/' + cid + '.json').then(function (r) { return r.json(); }).then(function (j) { cache[cid] = j; return j; });
+}
+function DCLogic(p) { this.props = p || {}; this.state = {}; }
+DCLogic.prototype.setState = function (o) {
+  if (this.__dead) return;
+  var add = typeof o === 'function' ? o(this.state) : o;
+  this.state = Object.assign({}, this.state, add);
+  if (this.__rr) this.__rr();
+};
+var timers = new Set();
+var _si = window.setInterval, _st = window.setTimeout, _ci = window.clearInterval, _ct = window.clearTimeout;
+window.setInterval = function (f, t) { var id = _si(f, t); timers.add(id); return id; };
+window.setTimeout = function (f, t) { var id = _st(f, t); timers.add(id); return id; };
+function clearPageTimers() { timers.forEach(function (id) { _ci(id); _ct(id); }); timers.clear(); }
+var HOLE = /\{\{\s*([A-Za-z_][\w.]*)\s*\}\}/g, ONE = /^\s*\{\{\s*([A-Za-z_][\w.]*)\s*\}\}\s*$/;
+function lookup(scope, path) {
+  var parts = path.split('.'); var v = scope;
+  for (var i = 0; i < parts.length; i++) { if (v == null) return undefined; v = v[parts[i]]; }
+  return v;
+}
+function fill(str, scope) {
+  return str.replace(HOLE, function (m, p) { var v = lookup(scope, p); return (v == null || typeof v === 'function') ? '' : String(v); });
+}
+function build(node, scope, out) {
+  if (node.nodeType === 3) { out.push(document.createTextNode(fill(node.nodeValue, scope))); return; }
+  if (node.nodeType !== 1) return;
+  var name = node.localName;
+  if (name === 'sc-for') {
+    var m = (node.getAttribute('list') || '').match(ONE);
+    var list = m ? lookup(scope, m[1]) : null; var as = node.getAttribute('as') || 'item';
+    (Array.isArray(list) ? list : []).forEach(function (it, idx) {
+      var sc = Object.create(scope); sc[as] = it; sc.$index = idx;
+      Array.prototype.forEach.call(node.childNodes, function (c) { build(c, sc, out); });
+    });
+    return;
+  }
+  if (name === 'sc-if') {
+    var m2 = (node.getAttribute('value') || '').match(ONE);
+    if (m2 && lookup(scope, m2[1])) Array.prototype.forEach.call(node.childNodes, function (c) { build(c, scope, out); });
+    return;
+  }
+  var e = node.namespaceURI && node.namespaceURI !== 'http://www.w3.org/1999/xhtml' ? document.createElementNS(node.namespaceURI, node.tagName) : document.createElement(name);
+  Array.prototype.forEach.call(node.attributes, function (a) {
+    if (/^hint-/.test(a.name)) return;
+    if (/^on[a-z]+$/i.test(a.name)) {
+      var mm = a.value.match(ONE); var fn = mm ? lookup(scope, mm[1]) : null;
+      if (typeof fn === 'function') e.addEventListener(a.name.slice(2).toLowerCase(), function (ev) { fn(ev); });
+      return;
+    }
+    try { if (a.namespaceURI) e.setAttributeNS(a.namespaceURI, a.name, fill(a.value, scope)); else e.setAttribute(a.name, fill(a.value, scope)); } catch (x) {}
+  });
+  var kids = node.localName === 'template' ? node.content.childNodes : node.childNodes;
+  var sub = [];
+  Array.prototype.forEach.call(kids, function (c) { build(c, scope, sub); });
+  sub.forEach(function (c) { e.appendChild(c); });
+  out.push(e);
+}
+var current = null;
+function unmount() {
+  if (current && current.inst) { try { if (current.inst.componentWillUnmount) current.inst.componentWillUnmount(); } catch (e) {} current.inst.__dead = true; }
+  clearPageTimers(); current = null;
+}
+function mountPage(frame, page, onLink) {
+  unmount();
+  var tplEl = document.createElement('template'); tplEl.innerHTML = page.tpl;
+  var C;
+  try { C = new Function('DCLogic', page.js)(DCLogic); } catch (e) { C = function () { DCLogic.call(this); }; C.prototype = Object.create(DCLogic.prototype); C.prototype.renderVals = function () { return {}; }; }
+  var inst; try { inst = new C({}); } catch (e) { inst = new DCLogic({}); inst.renderVals = function () { return {}; }; }
+  var styleEl = document.getElementById('pagecss') || document.head.appendChild(el('style', { id: 'pagecss' }));
+  var pending = false;
+  function rr() {
+    if (pending) return; pending = true;
+    Promise.resolve().then(function () { pending = false; if (inst.__dead) return; draw(); });
+  }
+  function draw() {
+    var vals = {}; try { vals = (inst.renderVals && inst.renderVals()) || {}; } catch (e) { console.error(e); }
+    var out = []; Array.prototype.forEach.call(tplEl.content.childNodes, function (c) { build(c, vals, out); });
+    var holder = el('div');
+    out.forEach(function (n) { holder.appendChild(n); });
+    var css = ''; holder.querySelectorAll('style').forEach(function (s) { css += s.textContent; s.remove(); });
+    styleEl.textContent = page.css.replace(/<\/?style[^>]*>/g, '') + css;
+    holder.querySelectorAll('a[href]').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        var h = a.getAttribute('href');
+        if (/^https?:/.test(h)) { a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener'); return; }
+        ev.preventDefault(); onLink(h);
+      });
+    });
+    frame.innerHTML = ''; while (holder.firstChild) frame.appendChild(holder.firstChild);
+  }
+  inst.__rr = rr;
+  current = { inst: inst };
+  draw();
+}
+
+/* ---------- screens ---------- */
+function intro() {
+  var s = el('div', { 'class': 'scr' });
+  if (testBanner) s.appendChild(testBanner);
+  var pilot = S.grp === 'pilot';
+  s.appendChild(el('h1', null, [pilot ? 'A short check for pilots' : 'A short reading test']));
+  s.appendChild(el('p', null, [pilot
+    ? 'Thanks for taking a look. You will read one story about a real accident, retold from the NTSB report for a general audience. We would like to know whether it is accurate, fair to the crew and worth reading.'
+    : 'Thanks for taking part. You will read one story about a real aviation accident, retold from the official investigation report so it reads well on a phone.']));
+  s.appendChild(el('p', null, ['Reading takes about 10 to 15 minutes. After that there are a few short questions.']));
+  s.appendChild(el('p', null, ['Read it the way you would at home. If a page seems unclear, wrong, boring or really good, you can tap \u201cFlag\u201d at the top. If you would normally stop reading at some point, tap \u201cI would stop here\u201d. Both are optional.']));
+  s.appendChild(el('hr'));
+  s.appendChild(el('p', { 'class': 'small' }, ['The story is about a real accident and may mention people who died. Your answers are anonymous and we do not ask for your name or email. Besides your answers we only record which pages you open and for how long. Some illustrations are AI generated, the photos come from the investigation. If you close the page you can come back later on the same device.']));
+  s.appendChild(el('button', { type: 'button', 'class': 'btn', on: { click: function () { send('start', { ua: navigator.userAgent, w: innerWidth, h: innerHeight }); go('read'); } } }, ['Start reading']));
+  return s;
+}
+function storyView() {
+  var cid = S.cid, k = 0;
+  var root = el('div', { 'class': 'story' });
+  var lbl = el('div', { 'class': 'lbl' }, ['']);
+  var flagBtn = el('button', { type: 'button', 'class': 'pill', 'aria-label': 'Flag this page' }, [svgFlag(), 'Flag']);
+  var stopBtn = el('button', { type: 'button', 'class': 'pill' }, ['I would stop here']);
+  var doneBtn = el('button', { type: 'button', 'class': 'pill acc' }, ['Finish story']);
+  doneBtn.style.display = 'none';
+  var bar = el('div', { 'class': 'bar' }, [lbl, stopBtn, flagBtn, doneBtn]);
+  var stage = el('div', { 'class': 'stage' });
+  var frame = el('div', { 'class': 'frame' });
+  stage.appendChild(frame);
+  root.appendChild(bar); root.appendChild(stage);
+  function fit() {
+    var w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
+    var sc = Math.min(w / 390, h / 844);
+    frame.style.transform = 'translateX(-50%) scale(' + sc + ')';
+    frame.style.borderRadius = sc < 1 && w < 500 ? '0' : '18px';
+  }
+  window.onresize = fit;
+  var data = null;
+  function idxOf(f) { for (var i = 0; i < data.pages.length; i++) if (data.pages[i].f === f) return i; return -1; }
+  function show(n) {
+    n = Math.max(0, Math.min(data.pages.length - 1, n));
+    S.page[cid] = n; save();
+    send('view', { cid: cid, k: k, page: n, of: data.pages.length });
+    mountPage(frame, data.pages[n], function (h) {
+      var i = idxOf(h);
+      if (i >= 0) show(i);
+      else if (n === data.pages.length - 1) finish(false);
+    });
+    var last = n === data.pages.length - 1;
+    doneBtn.style.display = last ? '' : 'none';
+    stopBtn.style.display = last ? 'none' : '';
+    lbl.textContent = 'Page ' + (n + 1) + ' of ' + data.pages.length;
+  }
+  function finish(stopped) {
+    unmount(); window.onresize = null;
+    send(stopped ? 'stop' : 'finish', { cid: cid, k: k, page: S.page[cid] });
+    S.ans.stopped = !!stopped; S.ans.stopPage = S.page[cid];
+    go('questions');
+  }
+  doneBtn.addEventListener('click', function () { finish(false); });
+  stopBtn.addEventListener('click', function () {
+    confirmSheet('Stop reading here?', 'That is fine and useful to know. You will go straight to the questions.', 'Yes, stop here', function () { finish(true); });
+  });
+  flagBtn.addEventListener('click', function () {
+    flagSheet(function (tags, note) {
+      send('flag', { cid: cid, k: k, page: S.page[cid], tags: tags, note: note });
+      flagBtn.classList.add('ok'); flagBtn.lastChild.textContent = 'Saved';
+      _st(function () { flagBtn.classList.remove('ok'); flagBtn.lastChild.textContent = 'Flag'; }, 1600);
+    });
+  });
+  loadCase(cid).then(function (d) { data = d; fit(); show(S.page[cid] || 0); });
+  requestAnimationFrame(fit);
+  return root;
+}
+function svgFlag() {
+  var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('width', '16'); s.setAttribute('height', '16'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('aria-hidden', 'true');
+  s.innerHTML = '<path d="M5 21V4M5 4h11l-2 4 2 4H5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  return s;
+}
+function sheet(content) {
+  var bg = el('div', { 'class': 'sheetbg' });
+  var sh = el('div', { 'class': 'sheet', role: 'dialog', 'aria-modal': 'true' }, content);
+  bg.appendChild(sh);
+  bg.addEventListener('click', function (e) { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
+  return bg;
+}
+function confirmSheet(title, text, yes, onYes) {
+  var bg;
+  var no = el('button', { type: 'button', 'class': 'btn ghost' }, ['Keep reading']);
+  var ok = el('button', { type: 'button', 'class': 'btn' }, [yes]);
+  bg = sheet([el('h2', { style: 'margin:0;font-family:Inter Tight,system-ui;font-size:20px' }, [title]), el('p', { style: 'margin:0;color:#2b2b2b;line-height:1.45' }, [text]), el('div', { 'class': 'row' }, [no, ok])]);
+  no.addEventListener('click', function () { bg.remove(); });
+  ok.addEventListener('click', function () { bg.remove(); onYes(); });
+}
+function flagSheet(onSave) {
+  var st = {};
+  var def = { id: 'tags', type: 'multi', label: 'What is up with this page?', options: ['Unclear', 'Something is wrong', 'Boring', 'Really good'] };
+  var q = Q(def, st);
+  var ta = el('textarea', { placeholder: 'Optional note', 'aria-label': 'Optional note', style: 'min-height:70px' });
+  var cancel = el('button', { type: 'button', 'class': 'btn ghost' }, ['Cancel']);
+  var ok = el('button', { type: 'button', 'class': 'btn' }, ['Save']);
+  var bg = sheet([q, ta, el('div', { 'class': 'row' }, [cancel, ok])]);
+  cancel.addEventListener('click', function () { bg.remove(); });
+  ok.addEventListener('click', function () {
+    if (!(st.tags && st.tags.length) && !ta.value.trim()) { bg.remove(); return; }
+    bg.remove(); onSave(st.tags || [], ta.value.trim());
+  });
+}
+function questions() {
+  var store = S.ans;
+  return form('A few questions', S.ans.stopped ? 'Please answer based on what you read.' : '', defs(), store, 'Send my answers', function () {
+    send('final', { answers: store });
+    go('done');
+  });
+}
+function done() {
+  var s = el('div', { 'class': 'scr', style: 'justify-content:center' });
+  s.appendChild(el('h1', null, ['Thank you']));
+  s.appendChild(el('p', null, ['That was all. Your answers help make these stories clearer and more accurate. You can close this page now.']));
+  return s;
+}
+function render() {
+  app.innerHTML = '';
+  var st = S.step;
+  if (st === 'intro') app.appendChild(intro());
+  else if (st === 'read') app.appendChild(storyView());
+  else if (st === 'questions') app.appendChild(questions());
+  else app.appendChild(done());
+}
+window.__wtdbg = { loadCase: loadCase, mountPage: mountPage };
+render();
+flush();
+})();
+</script>
+</body>
+</html>
