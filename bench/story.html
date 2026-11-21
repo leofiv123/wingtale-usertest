@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Alaska Airlines Flight 261</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#fff;color:#161616;font-family:'Source Serif 4',Georgia,serif}
+article{max-width:680px;margin:0 auto;padding:36px 22px 80px}
+.kicker{font-family:Inter,system-ui,sans-serif;font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#666}
+h1{font-family:Inter,system-ui,sans-serif;font-size:34px;line-height:1.12;letter-spacing:-.02em;margin:8px 0 18px}
+h2{font-family:Inter,system-ui,sans-serif;font-size:21px;margin:40px 0 10px}
+p,li{font-size:19px;line-height:1.7}
+blockquote{margin:18px 0;padding:4px 0 4px 18px;border-left:3px solid #d9480f;font-style:italic;color:#333}
+#map{height:300px;border-radius:12px;margin:18px 0 6px}
+figure{margin:24px 0}
+figure img{width:100%;border-radius:10px;background:#eee}
+figcaption,.cap{font-family:Inter,system-ui,sans-serif;font-size:13px;color:#666;margin-top:6px;line-height:1.45}
+.meta{font-family:Inter,system-ui,sans-serif;font-size:14px;color:#666}
+</style>
+</head>
+<body>
+<article>
+<div class="kicker">Accident story · NTSB report AAR-02/01</div>
+<h1 id="title">The threads that wore away. Alaska Airlines Flight 261</h1>
+<div id="map"></div>
+<div class="cap" id="mapcap"></div>
+<div id="body">Loading…</div>
+<p class="meta">Source National Transportation Safety Board, Aircraft Accident Report NTSB/AAR-02/01. Retold in our own words; quotes and photographs are from the report and in the public domain.</p>
+</article>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+fetch('story.json').then(r=>r.json()).then(s=>{
+  document.getElementById('body').innerHTML=marked.parse(s.md);
+  const m=L.map('map',{scrollWheelZoom:false}).setView([s.lat,s.lng],9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:13,attribution:'© OpenStreetMap'}).addTo(m);
+  L.circleMarker([s.lat,s.lng],{radius:8,color:'#d9480f',weight:3,fillOpacity:.5}).addTo(m);
+  document.getElementById('mapcap').textContent=s.mapcap;
+});
+</script>
+</body>
+</html>
